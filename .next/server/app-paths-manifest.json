@@ -1,1 +1,3 @@
-{}
+{
+  "/api/master-data/levels/route": "app/api/master-data/levels/route.js"
+}

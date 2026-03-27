@@ -9,8 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-// ==================== GET ALL ====================
-// ================= GET VALIDITY PERIODS =================
+// ================= GET =================
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -21,7 +20,6 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    // ✅ WHERE (clean pattern)
     const where: any = {
       isActive: true,
     };
@@ -33,10 +31,8 @@ export async function GET(req: Request) {
       };
     }
 
-    // ✅ COUNT
     const total = await prisma.validityPeriod.count({ where });
 
-    // ✅ FETCH
     const data = await prisma.validityPeriod.findMany({
       where,
       skip,
@@ -46,29 +42,31 @@ export async function GET(req: Request) {
       },
     });
 
-    // ✅ SAME RESPONSE FORMAT
-    return NextResponse.json({
-      status: true,
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        status: true,
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    });
+      { headers: corsHeaders } // ✅ FIX HERE
+    );
 
   } catch (error: any) {
     console.error("VALIDITY PERIOD ERROR:", error);
 
     return NextResponse.json(
       { status: false, message: error.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders } // ✅ FIX HERE
     );
   }
 }
 
-// ==================== CREATE ====================
+// ================= POST =================
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -81,7 +79,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Duplicate check
     const existing = await prisma.validityPeriod.findUnique({
       where: { name: body.name },
     });
@@ -93,7 +90,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sort order logic
     const maxOrder = await prisma.validityPeriod.aggregate({
       _max: { sortOrder: true },
     });
@@ -116,8 +112,10 @@ export async function POST(request: NextRequest) {
       status: 201,
       headers: corsHeaders,
     });
+
   } catch (error) {
     console.error("POST validity-periods error:", error);
+
     return NextResponse.json(
       { success: false, error: "Failed to create validity period" },
       { status: 500, headers: corsHeaders }
@@ -125,7 +123,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ==================== OPTIONS (CORS FIX) ====================
+// ================= OPTIONS =================
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
