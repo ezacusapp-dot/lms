@@ -1,17 +1,15 @@
-// app/api/master-data/levels/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateMasterData } from "@/lib/validations";
 import type { ApiResponse, MasterDataResponse } from "@/types/course-category";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // 🔥 allow React app
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-
-// ==================== GET ALL COURSE LEVELS ====================
-// ================= GET COURSE LEVELS =================
+// ================= GET =================
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -22,10 +20,7 @@ export async function GET(req: Request) {
 
     const skip = (page - 1) * limit;
 
-    // ✅ WHERE (clean pattern)
-    const where: any = {
-      isActive: true,
-    };
+    const where: any = { isActive: true };
 
     if (search) {
       where.name = {
@@ -34,42 +29,40 @@ export async function GET(req: Request) {
       };
     }
 
-    // ✅ COUNT
     const total = await prisma.courseLevel.count({ where });
 
-    // ✅ FETCH
     const levels = await prisma.courseLevel.findMany({
       where,
       skip,
       take: limit,
-      orderBy: {
-        sortOrder: "asc",
-      },
+      orderBy: { sortOrder: "asc" },
     });
 
-    // ✅ SAME RESPONSE FORMAT
-    return NextResponse.json({
-      status: true,
-      data: levels,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        status: true,
+        data: levels,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    });
+      { headers: corsHeaders } // ✅ added
+    );
 
   } catch (error: any) {
     console.error("COURSE LEVEL ERROR:", error);
 
     return NextResponse.json(
       { status: false, message: error.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders } // ✅ added
     );
   }
 }
 
-// ==================== CREATE COURSE LEVEL ====================
+// ================= POST =================
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -78,23 +71,21 @@ export async function POST(request: NextRequest) {
     if (errors.length > 0) {
       return NextResponse.json(
         { success: false, error: errors.join(", ") },
-        { status: 400,headers: corsHeaders }
+        { status: 400, headers: corsHeaders }
       );
     }
 
-    // Check for duplicate
     const existing = await prisma.courseLevel.findUnique({
       where: { name: body.name },
     });
 
     if (existing) {
       return NextResponse.json(
-        { success: false, error: "Course level with this name already exists" },
-        { status: 409,headers: corsHeaders }
+        { success: false, error: "Course level already exists" },
+        { status: 409, headers: corsHeaders }
       );
     }
 
-    // Get max sort order
     const maxOrder = await prisma.courseLevel.aggregate({
       _max: { sortOrder: true },
     });
@@ -102,7 +93,8 @@ export async function POST(request: NextRequest) {
     const level = await prisma.courseLevel.create({
       data: {
         name: body.name,
-        sortOrder: body.sortOrder ?? (maxOrder._max.sortOrder ?? 0) + 1,
+        sortOrder:
+          body.sortOrder ?? (maxOrder._max.sortOrder ?? 0) + 1,
       },
     });
 
@@ -112,12 +104,22 @@ export async function POST(request: NextRequest) {
       message: "Course level created successfully",
     };
 
-    return NextResponse.json(response, { status: 201 });
+    return NextResponse.json(response, {
+      status: 201,
+      headers: corsHeaders, // ✅ added
+    });
+
   } catch (error) {
-    console.error("POST /api/master-data/levels error:", error);
+    console.error("POST levels error:", error);
+
     return NextResponse.json(
       { success: false, error: "Failed to create course level" },
-      { status: 500,headers: corsHeaders }
+      { status: 500, headers: corsHeaders }
     );
   }
+}
+
+// ================= OPTIONS =================
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
 }
