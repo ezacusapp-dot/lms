@@ -1,4 +1,3 @@
-// app/api/course-categories/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateCategoryCreate } from "@/lib/validations";
@@ -10,19 +9,17 @@ import type {
 } from "@/types/course-category";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // 🔥 allow React app
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+// ================= OPTIONS =================
 export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: corsHeaders,
-  });
+  return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// Include relations for full response
+// Include relations
 const categoryIncludes = {
   level: true,
   durationType: true,
@@ -33,11 +30,11 @@ const categoryIncludes = {
   },
 };
 
-
-// ==================== GET ALL CATEGORIES ====================
+// ================= GET =================
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const search = searchParams.get("search") || "";
@@ -47,7 +44,6 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    // Build where clause
     const where: any = {};
 
     if (search) {
@@ -92,25 +88,25 @@ export async function GET(request: NextRequest) {
       },
     };
 
-   // return NextResponse.json(response);
-   return NextResponse.json(response, {
-  headers: corsHeaders,
-});
+    return NextResponse.json(response, {
+      headers: corsHeaders, // ✅ ensured
+    });
+
   } catch (error) {
-    console.error("GET /api/course-categories error:", error);
+    console.error("GET course-categories error:", error);
+
     return NextResponse.json(
       { success: false, error: "Failed to fetch course categories" },
-      { status: 500 ,headers: corsHeaders}
+      { status: 500, headers: corsHeaders } // ✅ ensured
     );
   }
 }
 
-// ==================== CREATE CATEGORY ====================
+// ================= POST =================
 export async function POST(request: NextRequest) {
   try {
     const body: CreateCourseCategoryRequest = await request.json();
 
-    // Validate
     const validationErrors = validateCategoryCreate(body);
     if (validationErrors.length > 0) {
       return NextResponse.json(
@@ -119,28 +115,23 @@ export async function POST(request: NextRequest) {
           error: "Validation failed",
           message: validationErrors.join(", "),
         },
-        { status: 400 ,headers: corsHeaders}
+        { status: 400, headers: corsHeaders }
       );
     }
 
-    // Check for duplicate code
     const existingCategory = await prisma.courseCategory.findUnique({
       where: { code: body.code },
     });
 
     if (existingCategory) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Category with this code already exists",
-        },
-        { status: 409 ,headers: corsHeaders}
+        { success: false, error: "Category already exists" },
+        { status: 409, headers: corsHeaders }
       );
     }
 
-    // Create category with nested certificate template in a transaction
     const category = await prisma.$transaction(async (tx) => {
-      const newCategory = await tx.courseCategory.create({
+      return await tx.courseCategory.create({
         data: {
           name: body.name,
           code: body.code,
@@ -154,7 +145,6 @@ export async function POST(request: NextRequest) {
           createdBy: body.createdBy || null,
           synced: false,
 
-          // Connect to master data relations
           ...(body.levelId && {
             level: { connect: { id: body.levelId } },
           }),
@@ -162,7 +152,6 @@ export async function POST(request: NextRequest) {
             durationType: { connect: { id: body.durationTypeId } },
           }),
 
-          // Create linked certificate template
           certificateTemplate: {
             create: {
               certificateName: body.certificateTemplate.certificateName,
@@ -179,18 +168,21 @@ export async function POST(request: NextRequest) {
                 body.certificateTemplate.backgroundColor || "#FFFFFF",
               primaryColor:
                 body.certificateTemplate.primaryColor || "#49205E",
-              accentColor: body.certificateTemplate.accentColor || "#BC579E",
+              accentColor:
+                body.certificateTemplate.accentColor || "#BC579E",
               logoUrl: body.certificateTemplate.logoUrl || null,
               backgroundPattern:
                 body.certificateTemplate.backgroundPattern || null,
-              sealEnabled: body.certificateTemplate.sealEnabled ?? true,
+              sealEnabled:
+                body.certificateTemplate.sealEnabled ?? true,
               qrPosition:
                 body.certificateTemplate.qrPosition || "bottom-right",
 
-              // Connect award category if provided
               ...(body.certificateTemplate.awardCategoryId && {
                 awardCategory: {
-                  connect: { id: body.certificateTemplate.awardCategoryId },
+                  connect: {
+                    id: body.certificateTemplate.awardCategoryId,
+                  },
                 },
               }),
             },
@@ -198,8 +190,6 @@ export async function POST(request: NextRequest) {
         },
         include: categoryIncludes,
       });
-
-      return newCategory;
     });
 
     const response: ApiResponse<CourseCategoryResponse> = {
@@ -209,16 +199,18 @@ export async function POST(request: NextRequest) {
         ? "Category saved as draft"
         : "Category created successfully",
     };
-return NextResponse.json(response, {
-    status: 201,
-    headers: corsHeaders,
-  });
-   // return NextResponse.json(response, { status: 201 });
+
+    return NextResponse.json(response, {
+      status: 201,
+      headers: corsHeaders, // ✅ ensured
+    });
+
   } catch (error) {
-    console.error("POST /api/course-categories error:", error);
+    console.error("POST course-categories error:", error);
+
     return NextResponse.json(
       { success: false, error: "Failed to create course category" },
-      { status: 500,headers: corsHeaders }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
