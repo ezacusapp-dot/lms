@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CourseLevel {
+  id         String           @id @default(cuid())
+  name       String           @unique
+  sortOrder  Int              @default(0)
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  categories CourseCategory[]
+  Courses    Courses[]
+
+  @@map("course_levels")
+}
+
+model CourseDurationType {
+  id         String           @id @default(cuid())
+  name       String           @unique
+  sortOrder  Int              @default(0)
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  categories CourseCategory[]
+
+  @@map("course_duration_types")
+}
+
+model AwardCategory {
+  id           String                @id @default(cuid())
+  name         String                @unique
+  sortOrder    Int                   @default(0)
+  isActive     Boolean               @default(true)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  certificates CertificateTemplate[]
+
+  @@map("award_categories")
+}
+
+model CourseCategory {
+  id                  String               @id @default(cuid())
+  name                String
+  code                String               @unique
+  description         String?
+  color               String               @default("#49205E")
+  icon                String?
+  categoryLogo        String?
+  categoryBackground  String?
+  isDraft             Boolean              @default(false)
+  isActive            Boolean              @default(true)
+  synced              Boolean              @default(false)
+  syncedAt            DateTime?
+  createdBy           String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  levelId             String?
+  durationTypeId      String?
+  certificateTemplate CertificateTemplate?
+  durationType        CourseDurationType?  @relation(fields: [durationTypeId], references: [id])
+  level               CourseLevel?         @relation(fields: [levelId], references: [id])
+  Courses             Courses[]
+
+  @@map("course_categories")
+}
+
+model CertificateTemplate {
+  id                String         @id @default(cuid())
+  certificateName   String
+  passThreshold     Int            @default(75)
+  includeRanking    Boolean        @default(true)
+  includeScore      Boolean        @default(true)
+  validityPeriod    String         @default("Lifetime")
+  gradeA            Int            @default(90)
+  gradeB            Int            @default(75)
+  gradeC            Int            @default(60)
+  borderStyle       String         @default("classic")
+  backgroundColor   String         @default("#FFFFFF")
+  primaryColor      String         @default("#49205E")
+  accentColor       String         @default("#BC579E")
+  logoUrl           String?
+  backgroundPattern String?
+  sealEnabled       Boolean        @default(true)
+  qrPosition        String         @default("bottom-right")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  categoryId        String         @unique
+  awardCategoryId   String?
+  awardCategory     AwardCategory? @relation(fields: [awardCategoryId], references: [id])
+  category          CourseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("certificate_templates")
+}
+
+model ValidityPeriod {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("validity_periods")
+}
+
+model Courses {
+  id             String          @id @default(uuid())
+  title          String
+  duration       String?
+  description    String?
+  createdBy      String?
+  status         String          @default("Draft")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  categoryId     String?
+  levelId        String?
+  CourseCategory CourseCategory? @relation(fields: [categoryId], references: [id])
+  CourseLevel    CourseLevel?    @relation(fields: [levelId], references: [id])
+  Modules        Modules[]
+
+  @@map("courses")
+}
+
+model Modules {
+  id          String    @id @default(uuid())
+  courseId    String
+  title       String
+  order       Int
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lessons     Lessons[]
+  courses     Courses   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, order])
+  @@map("modules")
+}
+
+model Lessons {
+  id          String   @id @default(uuid())
+  moduleId    String
+  title       String
+  contentType String
+  fileUrl     String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  module      Modules  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, order])
+  @@map("lessons")
+}
+
+enum ContentType {
+  Video
+  PDF
+  Document
+  Assignment
+  Link
+}
